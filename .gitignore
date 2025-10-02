@@ -1,0 +1,9 @@
+# Ignore virtual environment
+manim-venv/
+
+# Ignore compiled files
+__pycache__/
+*.pyc
+
+# Ignore Manim media output
+media/
