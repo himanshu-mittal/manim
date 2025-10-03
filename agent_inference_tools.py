@@ -1,4 +1,9 @@
-from manim import *
+from manim import (
+    ThreeDScene, Prism, Square, VGroup, Rectangle, Torus, Text, Sphere, 
+    Cylinder, RoundedRectangle, SurroundingRectangle, FadeIn, FadeOut, 
+    Create, UpdateFromAlphaFunc, DEGREES, TAU, BLUE_E, WHITE, GREY_A, 
+    YELLOW_B, YELLOW_C, RIGHT, LEFT, UP, DOWN, IN, OUT, smooth
+)
 import numpy as np  # needed for vector math
 
 # 3D scene: token flow -> pause -> tool calls -> results -> resume
