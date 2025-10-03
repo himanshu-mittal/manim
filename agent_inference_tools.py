@@ -1,10 +1,12 @@
 from manim import (
-    ThreeDScene, Prism, Square, VGroup, Rectangle, Torus, Text, Sphere, 
-    Cylinder, RoundedRectangle, SurroundingRectangle, FadeIn, FadeOut, 
-    Create, UpdateFromAlphaFunc, DEGREES, TAU, BLUE_E, WHITE, GREY_A, 
-    YELLOW_B, YELLOW_C, RIGHT, LEFT, UP, DOWN, IN, OUT, smooth
+    ThreeDScene, Prism, Square, VGroup, Rectangle, Torus, Text, Sphere,
+    Cylinder, RoundedRectangle, SurroundingRectangle, FadeIn, FadeOut,
+    Create, UpdateFromAlphaFunc, DEGREES, TAU, BLUE_E, WHITE, GREY_A,
+    YELLOW_B, YELLOW_C, RIGHT, LEFT, UP, DOWN, IN, OUT, smooth,
+    BackgroundRectangle, Line,
 )
 import numpy as np  # needed for vector math
+
 
 # 3D scene: token flow -> pause -> tool calls -> results -> resume
 class InceptionToolUse3D(ThreeDScene):
@@ -15,15 +17,20 @@ class InceptionToolUse3D(ThreeDScene):
 
         # ------------ Helpers ------------
         def make_block(pos, w=1.6, h=1.0, d=1.0, color="#16324d"):
-            block = Prism(dimensions=(w, h, d), fill_opacity=1.0, fill_color=color,
-                          stroke_color=BLUE_E, stroke_width=1.5)
+            block = Prism(
+                dimensions=(w, h, d),
+                fill_opacity=1.0,
+                fill_color=color,
+                stroke_color=BLUE_E,
+                stroke_width=1.5,
+            )
             block.move_to(pos)
-            face = Square(side_length=0.95*w, stroke_width=0).set_fill("#102331", opacity=0.9)
-            face.move_to(block.get_center() + OUT * (d/2 + 0.001))
+            face = Square(side_length=0.95 * w, stroke_width=0).set_fill("#102331", opacity=0.9)
+            face.move_to(block.get_center() + OUT * (d / 2 + 0.001))
             bars = VGroup(
-                Rectangle(width=0.08*w, height=0.5*h, fill_opacity=1, fill_color="#26a69a", stroke_width=0),
-                Rectangle(width=0.08*w, height=0.35*h, fill_opacity=1, fill_color="#42a5f5", stroke_width=0),
-                Rectangle(width=0.08*w, height=0.25*h, fill_opacity=1, fill_color="#ab47bc", stroke_width=0),
+                Rectangle(width=0.08 * w, height=0.5 * h, fill_opacity=1, fill_color="#26a69a", stroke_width=0),
+                Rectangle(width=0.08 * w, height=0.35 * h, fill_opacity=1, fill_color="#42a5f5", stroke_width=0),
+                Rectangle(width=0.08 * w, height=0.25 * h, fill_opacity=1, fill_color="#ab47bc", stroke_width=0),
             ).arrange(RIGHT, buff=0.06).move_to(face.get_center())
             return VGroup(block, face, bars)
 
@@ -31,22 +38,39 @@ class InceptionToolUse3D(ThreeDScene):
             ring = Torus(
                 major_radius=radius,
                 minor_radius=0.12,
-                u_range=[0, TAU],
-                v_range=[0, TAU],
                 fill_opacity=1,
                 fill_color=color,
                 stroke_color="#1a9e67",
                 stroke_width=1.5,
             )
-
             ring.move_to(pos)
-            tag = Text(label, font="DejaVu Sans").scale(0.35).set_color(GREY_A)
-            tag.next_to(ring, OUT, buff=0.05)
-            return VGroup(ring, tag)
+
+            # Label that always faces camera (billboarding is applied later)
+            tag_text = Text(label, font="DejaVu Sans").scale(0.35).set_color(GREY_A)
+            tag = VGroup(tag_text, BackgroundRectangle(tag_text, fill_opacity=0.6, buff=0.06))
+
+            # Place a bit OUT and slightly UP from the ring so it doesn’t overlap
+            tag.move_to(ring.get_center() + 0.25 * OUT + 0.18 * UP)
+
+            # Thin connector so the label “points” to the ring
+            connector = Line(
+                tag.get_center() + 0.1 * DOWN,
+                ring.get_center(),
+                stroke_width=1.5,
+                color="#3a5161",
+            ).set_opacity(0.6)
+
+            return VGroup(ring, tag, connector)
 
         def sphere_pulse(color, r=0.08):
-            return Sphere(radius=r, resolution=(16, 16), fill_opacity=1, fill_color=color,
-                          stroke_width=0.5, stroke_color=WHITE)
+            return Sphere(
+                radius=r,
+                resolution=(16, 16),
+                fill_opacity=1,
+                fill_color=color,
+                stroke_width=0.5,
+                stroke_color=WHITE,
+            )
 
         # ------------ Layout ------------
         n_blocks = 6
@@ -55,10 +79,16 @@ class InceptionToolUse3D(ThreeDScene):
         blocks = VGroup()
         for i in range(n_blocks):
             blocks.add(make_block(pos=np.array([x0 + i * dx, 0.0, 0.0])))
-        self.play(*[FadeIn(b, shift=IN*0.2) for b in blocks], run_time=1.4)
+        self.play(*[FadeIn(b, shift=IN * 0.2) for b in blocks], run_time=1.4)
 
-        rail = Cylinder(radius=0.05, height=(n_blocks - 1) * dx + 1.2, direction=RIGHT,
-                        fill_opacity=1, fill_color="#0e2233", stroke_width=0)
+        rail = Cylinder(
+            radius=0.05,
+            height=(n_blocks - 1) * dx + 1.2,
+            direction=RIGHT,
+            fill_opacity=1,
+            fill_color="#0e2233",
+            stroke_width=0,
+        )
         rail.move_to(np.array([(x0 + (n_blocks - 1) * dx) / 2, -0.25, 0.0]))
         self.play(FadeIn(rail), run_time=0.5)
 
@@ -71,12 +101,26 @@ class InceptionToolUse3D(ThreeDScene):
 
         center_block_idx = n_blocks // 2
         center_pos = blocks[center_block_idx].get_center()
+
         tools = VGroup(
             make_tool_node("Search API", center_pos + np.array([-1.8, -1.2, -1.6]), color="#0c4a3e"),
-            make_tool_node("DB Query",   center_pos + np.array([ 0.0, -1.8, -2.0]), color="#12395b"),
-            make_tool_node("Code Exec",  center_pos + np.array([ 1.8, -1.2, -1.6]), color="#44235b"),
+            make_tool_node("DB Query", center_pos + np.array([0.0, -1.8, -2.0]), color="#12395b"),
+            make_tool_node("Code Exec", center_pos + np.array([1.8, -1.2, -1.6]), color="#44235b"),
         )
-        self.play(*[FadeIn(t, shift=DOWN*0.2) for t in tools], run_time=0.8)
+
+        # Make the labels billboard to the camera (no flipping/inversion)
+        for t in tools:
+            # t[1] is the tag VGroup (Text + background), t[2] is the connector
+            self.add_fixed_orientation_mobjects(t[1])
+            # Keep connector re-anchored if camera moves
+            t[2].add_updater(
+                lambda m, t=t: m.put_start_and_end_on(
+                    t[1].get_center() + 0.1 * DOWN,  # start near label
+                    t[0].get_center(),  # end at ring center
+                )
+            )
+
+        self.play(*[FadeIn(t, shift=DOWN * 0.2) for t in tools], run_time=0.8)
 
         def connector(p1, p2, color="#3a5161"):
             v = p2 - p1
@@ -99,27 +143,34 @@ class InceptionToolUse3D(ThreeDScene):
         ).set_opacity(0.35)
         self.play(FadeIn(link_lines), run_time=0.5)
 
-        # Token motion
-        def shift_tokens(dt):
-            for s in tokens:
+        # Token motion (attach updater to tokens, not the Scene)
+        def shift_tokens(mobj, dt):
+            for s in mobj:
                 s.shift(RIGHT * dt * 1.6)
                 if s.get_center()[0] > x0 + (n_blocks - 1) * dx + 0.8:
                     s.shift(LEFT * ((n_blocks - 1) * dx + 2.0))
 
-        self.add_updater(shift_tokens)
+        tokens.add_updater(shift_tokens)
         self.wait(1.6)
 
         # Pause
-        self.remove_updater(shift_tokens)
-        pause_plate = RoundedRectangle(width=1.1, height=0.7, corner_radius=0.08,
-                                       fill_opacity=1, fill_color="#17212b",
-                                       stroke_color=YELLOW_B, stroke_width=2)
-        bar1 = Rectangle(width=0.18, height=0.44, fill_opacity=1, fill_color=YELLOW_C, stroke_width=0).shift(LEFT*0.18)
-        bar2 = Rectangle(width=0.18, height=0.44, fill_opacity=1, fill_color=YELLOW_C, stroke_width=0).shift(RIGHT*0.18)
+        tokens.remove_updater(shift_tokens)
+        pause_plate = RoundedRectangle(
+            width=1.1,
+            height=0.7,
+            corner_radius=0.08,
+            fill_opacity=1,
+            fill_color="#17212b",
+            stroke_color=YELLOW_B,
+            stroke_width=2,
+        )
+        bar1 = Rectangle(width=0.18, height=0.44, fill_opacity=1, fill_color=YELLOW_C, stroke_width=0).shift(LEFT * 0.18)
+        bar2 = Rectangle(width=0.18, height=0.44, fill_opacity=1, fill_color=YELLOW_C, stroke_width=0).shift(RIGHT * 0.18)
         pause_icon = VGroup(pause_plate, bar1, bar2).move_to(center_pos + np.array([0, 0.0, 0.6]))
-        self.play(FadeIn(pause_icon, shift=OUT*0.2), run_time=0.5)
+        self.play(FadeIn(pause_icon, shift=OUT * 0.2), run_time=0.5)
 
         caption1 = Text("Policy pauses to decide tools (inception-time)", font="DejaVu Sans").scale(0.35).set_color(GREY_A)
+        self.add_fixed_orientation_mobjects(caption1)
         caption1.move_to(center_pos + np.array([0, 0.9, 0.6]))
         self.play(FadeIn(caption1), run_time=0.4)
 
@@ -127,8 +178,10 @@ class InceptionToolUse3D(ThreeDScene):
         def make_pulse_anim(p1, p2, color):
             dot = Sphere(radius=0.06, fill_opacity=1, fill_color=color, stroke_width=0.5, stroke_color=WHITE)
             dot.move_to(p1)
+
             def updater(m, alpha):
                 m.move_to(p1 + alpha * (p2 - p1))
+
             return dot, updater
 
         c_origin = center_pos + np.array([0, -0.25, 0])
@@ -143,14 +196,17 @@ class InceptionToolUse3D(ThreeDScene):
             UpdateFromAlphaFunc(p_out[0][0], p_out[0][1]),
             UpdateFromAlphaFunc(p_out[1][0], p_out[1][1]),
             UpdateFromAlphaFunc(p_out[2][0], p_out[2][1]),
-            run_time=1.2, rate_func=smooth
+            run_time=1.2,
+            rate_func=smooth,
         )
 
         # Tool glows
-        glows = VGroup(*[
-            SurroundingRectangle(t[0], color=c, buff=0.08).set_stroke(width=3).set_fill(opacity=0)
-            for t, c in zip(tools, ["#2dd4bf", "#93c5fd", "#e9d5ff"])
-        ])
+        glows = VGroup(
+            *[
+                SurroundingRectangle(t[0], color=c, buff=0.08).set_stroke(width=3).set_fill(opacity=0)
+                for t, c in zip(tools, ["#2dd4bf", "#93c5fd", "#e9d5ff"])
+            ]
+        )
         self.play(*[Create(g) for g in glows], run_time=0.5)
         self.play(*[FadeOut(g) for g in glows], run_time=0.4)
 
@@ -166,7 +222,8 @@ class InceptionToolUse3D(ThreeDScene):
             UpdateFromAlphaFunc(p_in[0][0], p_in[0][1]),
             UpdateFromAlphaFunc(p_in[1][0], p_in[1][1]),
             UpdateFromAlphaFunc(p_in[2][0], p_in[2][1]),
-            run_time=1.4, rate_func=smooth
+            run_time=1.4,
+            rate_func=smooth,
         )
 
         # Integrate pulse
@@ -175,8 +232,12 @@ class InceptionToolUse3D(ThreeDScene):
         self.play(FadeOut(halo), run_time=0.4)
 
         # Resume
-        self.add_updater(shift_tokens)
-        caption2 = Text("Tool outputs integrated → inference resumes (token stream continues)", font="DejaVu Sans").scale(0.35).set_color(GREY_A).to_edge(DOWN)
+        tokens.add_updater(shift_tokens)
+        caption2 = Text(
+            "Tool outputs integrated → inference resumes (token stream continues)",
+            font="DejaVu Sans",
+        ).scale(0.35).set_color(GREY_A).to_edge(DOWN)
+        self.add_fixed_orientation_mobjects(caption2)
         self.play(FadeIn(caption2), run_time=0.4)
         self.wait(2.0)
 
@@ -185,5 +246,8 @@ class InceptionToolUse3D(ThreeDScene):
         self.play(*[s.animate.set_fill("#34d399") for s in tokens[:6]], run_time=0.4)
         self.wait(0.8)
 
-        self.remove_updater(shift_tokens)
+        # Cleanup
+        tokens.remove_updater(shift_tokens)
+        for t in tools:
+            t[2].clear_updaters()
         self.wait(0.3)
